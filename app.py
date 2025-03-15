@@ -1,5 +1,6 @@
 import streamlit as st
 import sqlite3
+import pandas as pd  # Import pandas for better table display
 
 # Database setup
 DATABASE = "data.db"
@@ -63,17 +64,28 @@ if submit_button:
         # Convert registration status to string
         registration_status = "Registered" if registration_status else "Not Registered"
 
-        # Insert into database
         conn = get_db_connection()
-        conn.execute("""
-            INSERT INTO Student_Data (firstname, lastname, title, age, nationality, 
-            registration_status, num_courses, num_semesters) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (first_name, last_name, title, age, nationality, registration_status, num_courses, num_semesters))
-        conn.commit()
-        conn.close()
+        cursor = conn.cursor()
 
-        st.success(f"✅ Student {first_name} {last_name} has been successfully added!")
+        # Check if student already exists
+        cursor.execute("""
+            SELECT COUNT(*) FROM Student_Data WHERE firstname = ? AND lastname = ?
+        """, (first_name, last_name))
+        existing_student_count = cursor.fetchone()[0]
+
+        if existing_student_count > 0:
+            st.warning(f"⚠️ Student {first_name} {last_name} is already registered!")
+        else:
+            # Insert new record
+            cursor.execute("""
+                INSERT INTO Student_Data (firstname, lastname, title, age, nationality, 
+                registration_status, num_courses, num_semesters) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (first_name, last_name, title, age, nationality, registration_status, num_courses, num_semesters))
+            conn.commit()
+            st.success(f"✅ Student {first_name} {last_name} has been successfully added!")
+
+        conn.close()
 
 # Display the data table
 st.subheader("📜 Student Data Records")
@@ -83,6 +95,11 @@ conn.close()
 
 if students:
     st.write("### Registered Students")
-    st.table(students)
+
+    # Convert fetched data into a pandas DataFrame for a cleaner table format
+    df = pd.DataFrame(students, columns=["ID", "First Name", "Last Name", "Title", "Age", 
+                                         "Nationality", "Registration Status", "Courses", "Semesters"])
+    st.dataframe(df)  # Display table using pandas dataframe for better readability
+
 else:
     st.info("No student records found.")
